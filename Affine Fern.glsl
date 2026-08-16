@@ -13,7 +13,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
  */
-// credit to shadertoy and co! 
+// Credit to shadertoy and co! 
 // ============================================================================
 // REINHARD TONE MAPPING & DISPLAY
 // ============================================================================
