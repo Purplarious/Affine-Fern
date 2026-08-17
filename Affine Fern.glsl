@@ -21,6 +21,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 
     fragColor = vec4(color, 1.0);
 }
+
 // ============================================================================
 // PERSISTENT 5D BARNSLEY "HYPER-IFS" ENGINE (BUFFER A - RESOLUTION ENHANCED)
 // ============================================================================
