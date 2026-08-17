@@ -1,0 +1,94 @@
+{
+  "_comment": "metadata container from shadertoy"
+}
+{
+    "ver": "0.1",
+    "info": {
+      "id": "sfdXW8",
+      "date": "1786774286",
+      "viewed": 49,
+      "name": "Affine Fern",
+      "username": "purplarious",
+      "description": "idk. q and e to 'roll' the fern. space to pause. don't know what i'm doing.\nlots of controls. \ncredit isn't really mine to take. thank you everyone. \n",
+      "likes": 0,
+      "published": 1,
+      "flags": 48,
+      "usePreview": 0,
+      "tags": []
+    },
+    "renderpass": [
+      {
+        "inputs": [
+          {
+            "id": "4dXGR8",
+            "filepath": "/media/previz/buffer00.png",
+            "previewfilepath": "/media/previz/buffer00.png",
+            "type": "buffer",
+            "channel": 0,
+            "sampler": {
+              "filter": "linear",
+              "wrap": "clamp",
+              "vflip": "true",
+              "srgb": "false",
+              "internal": "byte"
+            },
+            "published": 1
+          }
+        ],
+        "outputs": [
+          {
+            "id": "4dfGRr",
+            "channel": 0
+          }
+        ],
+        "code": "\n\n// ============================================================================\n// MAIN IMAGE TAB - REINHARD TONE MAPPING & DISPLAY\n// ============================================================================\nvoid mainImage(out vec4 fragColor, in vec2 fragCoord) {\n    vec2 uv = fragCoord / iResolution.xy;\n    vec3 rawDensity = texture(iChannel0, uv).rgb;\n\n    // 1. Exposure adjustment\n    vec3 color = rawDensity * 1.2;\n\n    // 2. Reinhard tone mapping compresses HDR highlights to prevent blowout\n    color = color / (vec3(1.0) + color);\n\n    // 3. Gamma correction (sRGB curve)\n    color = pow(color, vec3(1.0 / 2.2));\n\n    fragColor = vec4(color, 1.0);\n}",
+        "name": "Image",
+        "description": "",
+        "type": "image"
+      },
+      {
+        "inputs": [
+          {
+            "id": "4dXGRr",
+            "filepath": "/presets/tex00.jpg",
+            "previewfilepath": "/presets/tex00.jpg",
+            "type": "keyboard",
+            "channel": 1,
+            "sampler": {
+              "filter": "linear",
+              "wrap": "clamp",
+              "vflip": "true",
+              "srgb": "false",
+              "internal": "byte"
+            },
+            "published": 1
+          },
+          {
+            "id": "4dXGR8",
+            "filepath": "/media/previz/buffer00.png",
+            "previewfilepath": "/media/previz/buffer00.png",
+            "type": "buffer",
+            "channel": 0,
+            "sampler": {
+              "filter": "linear",
+              "wrap": "clamp",
+              "vflip": "true",
+              "srgb": "false",
+              "internal": "byte"
+            },
+            "published": 1
+          }
+        ],
+        "outputs": [
+          {
+            "id": "4dXGR8",
+            "channel": 0
+          }
+        ],
+        "code": "\n\n// ============================================================================\n// PERSISTENT 5D BARNSLEY \"HYPER-IFS\" ENGINE (BUFFER A - RESOLUTION ENHANCED)\n// ============================================================================\n\n#define KEY_SPACE 32 // [Spacebar] : Toggle Automatic 5D Camera Orbit / Twist\n\n// Camera Movement Controls (XY Plane)\n#define KEY_W 87     // [W] : Move Up (+Y)\n#define KEY_S 83     // [S] : Move Down (-Y)\n#define KEY_A 65     // [A] : Move Left (-X)\n#define KEY_D 68     // [D] : Move Right (+X)\n\n// 4D / 5D Rotation Controls\n#define KEY_Q 81     // [Q] : Roll in ZW Hyperplane (Counter-Clockwise)\n#define KEY_E 69     // [E] : Roll in ZW Hyperplane (Clockwise)\n#define KEY_1 49     // [1] : Roll in WV Hyperplane (Counter-Clockwise)\n#define KEY_2 50     // [2] : Roll in WV Hyperplane (Clockwise)\n\n// Camera Zoom Controls\n#define KEY_Z 90     // [Z] : Zoom In  (Narrows FOV)\n#define KEY_X 88     // [X] : Zoom Out (Widens FOV)\n\n// Camera Depth Controls (Z Axis)\n#define KEY_N 78     // [N] : Dolly Forward (-Z)\n#define KEY_M 77     // [M] : Dolly Backward (+Z)\n\n// Vertical Fractal Spine Offset Controls\n#define KEY_F 70     // [F] : Shift Spine Upward\n#define KEY_R 82     // [R] : Shift Spine Downward\n\nmat2 rot2D(float a) {\n    float c = cos(a), s = sin(a);\n    return mat2(c, -s, s, c);\n}\n\nint seed = 1;\nvoid srand(int s) { seed = s; }\nint rand() { seed = seed * 0x343fd + 0x269ec3; return (seed >> 16) & 32767; }\nfloat frand() { return float(rand()) / 32767.0; }\n\nint hash(int n) {\n    n = (n << 13) ^ n;\n    return n * (n * n * 15731 + 789221) + 1376312589;\n}\n\nbool isKeyPressed(int keyCode) {\n    return texelFetch(iChannel1, ivec2(keyCode, 0), 0).x > 0.5;\n}\n\nvoid mainImage(out vec4 fragColor, in vec2 fragCoord) {\n    ivec2 px = ivec2(fragCoord);\n\n    // Seed RNG early for jitter computation\n    srand(hash(px.x + hash(px.y + hash(iFrame))));\n\n    // Sub-pixel jitter offset for multi-frame anti-aliasing\n    vec2 jitter = (vec2(frand(), frand()) - 0.5) / iResolution.xy;\n    vec2 uv = ((fragCoord + jitter) - 0.5 * iResolution.xy) / iResolution.y;\n\n    // --- READ PERSISTENT STATE FROM MEMORY TEXELS ---\n    vec4 state0 = texelFetch(iChannel0, ivec2(0, 0), 0); // CamX, CamY, CamZ, FOV\n    vec4 state1 = texelFetch(iChannel0, ivec2(1, 0), 0); // Yaw, Pitch, ZWRoll, SpinePos\n    vec4 state2 = texelFetch(iChannel0, ivec2(2, 0), 0); // WVRoll, LastMx, LastMy, MouseDown\n    vec4 state3 = texelFetch(iChannel0, ivec2(3, 0), 0); // AutoPanActive, SpacePrev, 0, 0\n\n    // Initialization on Frame 0\n    if (iFrame == 0) {\n        state0 = vec4(0.0, 0.0, 2.5, 1.0);\n        state1 = vec4(0.0, 0.0, 0.45, 5.0);\n        state2 = vec4(0.25, iMouse.xy, 0.0);\n        state3 = vec4(1.0, 0.0, 0.0, 0.0); // Auto-orbit/twist ON by default\n    }\n\nvec3 camPos     = state0.xyz;\nfloat fov       = state0.w;\nfloat yaw       = state1.x;\nfloat pitch     = state1.y;\nfloat zwRoll    = state1.z;\nfloat spinePos  = state1.w;\nfloat wvRoll    = state2.x;\nvec2 prevMouse  = state2.yz;\n\nfloat autoPanActive = state3.x;\nfloat spacePrev     = state3.y;\n\n// Save previous state for velocity calculation\nvec3 prevCamPos   = camPos;\nfloat prevYaw     = yaw;\nfloat prevPitch   = pitch;\nfloat prevZwRoll  = zwRoll;\nfloat prevWvRoll  = wvRoll;\n\n// --- SPACE BAR TOGGLE DEBOUNCE ---\nbool spacePressed = isKeyPressed(KEY_SPACE);\nif (spacePressed && spacePrev < 0.5) {\n    autoPanActive = (autoPanActive > 0.5) ? 0.0 : 1.0;\n}\nspacePrev = spacePressed ? 1.0 : 0.0;\n\n// --- AUTO-ORBIT & AUTO-TWIST ANIMATION ---\nif (autoPanActive > 0.5) {\n    float autoPanSpeed   = 0.35;\n    float autoTwistSpeed = 1.20;\n\n    yaw    += autoPanSpeed * iTimeDelta;\n    zwRoll += autoTwistSpeed * iTimeDelta;\n}\n\n// --- MOUSE PAN TRACKER ---\nvec2 mouse = iMouse.xy;\nif (iMouse.z > 0.0) {\n    if (state2.w > 0.5) {\n        vec2 mDelta = (mouse - prevMouse) / iResolution.xy;\n        yaw   += mDelta.x * 3.14;\n        pitch -= mDelta.y * 3.14;\n        pitch  = clamp(pitch, -1.55, 1.55);\n    }\nstate2.w = 1.0;\n} else {\nstate2.w = 0.0;\n}\nprevMouse = mouse;\n\n// --- FLIGHT CONTROLS ---\nfloat moveSpeed  = 0.025;\nfloat spineSpeed = 0.05;\nfloat fovSpeed   = 0.015;\nfloat rollSpeed  = 0.02;\n\nif (isKeyPressed(KEY_W)) camPos.y += moveSpeed;\nif (isKeyPressed(KEY_S)) camPos.y -= moveSpeed;\nif (isKeyPressed(KEY_A)) camPos.x -= moveSpeed;\nif (isKeyPressed(KEY_D)) camPos.x += moveSpeed;\n\nif (isKeyPressed(KEY_Q)) zwRoll -= rollSpeed;\nif (isKeyPressed(KEY_E)) zwRoll += rollSpeed;\n\nif (isKeyPressed(KEY_1)) wvRoll -= rollSpeed;\nif (isKeyPressed(KEY_2)) wvRoll += rollSpeed;\n\nif (isKeyPressed(KEY_Z)) fov *= (1.0 + fovSpeed);\nif (isKeyPressed(KEY_X)) fov *= (1.0 - fovSpeed);\n\nif (isKeyPressed(KEY_N)) camPos.z -= moveSpeed;\nif (isKeyPressed(KEY_M)) camPos.z += moveSpeed;\n\nif (isKeyPressed(KEY_F)) spinePos += spineSpeed;\nif (isKeyPressed(KEY_R)) spinePos -= spineSpeed;\nspinePos = clamp(spinePos, 0.0, 10.0);\n\n// --- WRITE MEMORY TEXELS (PROTECT STATE FROM DECAY) ---\nif (px == ivec2(0, 0)) { fragColor = vec4(camPos, fov); return; }\nif (px == ivec2(1, 0)) { fragColor = vec4(yaw, pitch, zwRoll, spinePos); return; }\nif (px == ivec2(2, 0)) { fragColor = vec4(wvRoll, prevMouse, state2.w); return; }\nif (px == ivec2(3, 0)) { fragColor = vec4(autoPanActive, spacePrev, 0.0, 0.0); return; }\n\n// --- MOTION DECAY & HIGH-ACCUMULATION LOGIC ---\nvec4 prevFrame = texelFetch(iChannel0, px, 0);\n\nfloat transVel = length(camPos - prevCamPos);\nfloat rotVel   = abs(yaw - prevYaw) + abs(pitch - prevPitch) + abs(zwRoll - prevZwRoll) + abs(wvRoll - prevWvRoll);\n\nfloat motion = clamp((transVel * 35.0) + (rotVel * 8.0), 0.0, 1.0);\n\n// High 0.992 decay when stationary allows long-term accumulation of razor-sharp detail\nfloat decayFactor = mix(0.992, 0.10, motion);\nvec3 density = prevFrame.rgb * decayFactor;\n\nfloat pointWeight = mix(0.12, 0.02, motion);\nint maxIterations = int(mix(8192.0, 1024.0, motion));\n\n// --- 5D AFFINE IFS FERN ENGINE ---\nvec2 q_xy = vec2(0.0);\nvec3 q_zwv = vec3(0.0);\n\nfor (int i = 0; i < 8192; i++) {\n    if (i >= maxIterations) break;\n\n    float p = frand();\n\n    if (p < 0.01) {\n        q_xy  = vec2(0.0, 0.16 * q_xy.y);\n        q_zwv = vec3(0.0);\n    } else if (p < 0.86) {\n    vec2 nxy = vec2(\n        0.85 * q_xy.x + 0.04 * q_xy.y - 0.02 * q_zwv.x,\n        -0.04 * q_xy.x + 0.85 * q_xy.y + 1.6\n    );\nvec3 nzwv = vec3(\n    0.02 * q_xy.x + 0.85 * q_zwv.x + 0.05 * q_zwv.y,\n    0.85 * q_zwv.y - 0.05 * q_zwv.x + 0.03 * q_zwv.z + 0.1,\n    0.85 * q_zwv.z - 0.03 * q_zwv.y\n);\nq_xy = nxy; q_zwv = nzwv;\n} else if (p < 0.93) {\nvec2 nxy = vec2(\n    0.20 * q_xy.x - 0.26 * q_xy.y + 0.12 * q_zwv.x,\n    0.23 * q_xy.x + 0.22 * q_xy.y + 1.6\n);\nvec3 nzwv = vec3(\n    -0.12 * q_xy.x + 0.22 * q_zwv.x + 0.15 * q_zwv.y,\n    0.22 * q_zwv.y - 0.15 * q_zwv.x + 0.20 * q_zwv.z + 0.2,\n    0.22 * q_zwv.z + 0.15 * q_zwv.y + 0.25\n);\nq_xy = nxy; q_zwv = nzwv;\n} else {\nvec2 nxy = vec2(\n    -0.15 * q_xy.x + 0.28 * q_xy.y - 0.12 * q_zwv.x,\n    0.26 * q_xy.x + 0.24 * q_xy.y + 0.44\n);\nvec3 nzwv = vec3(\n    0.12 * q_xy.x + 0.24 * q_zwv.x - 0.15 * q_zwv.y,\n    0.24 * q_zwv.y + 0.15 * q_zwv.x - 0.20 * q_zwv.z - 0.2,\n    0.24 * q_zwv.z - 0.15 * q_zwv.y - 0.25\n);\nq_xy = nxy; q_zwv = nzwv;\n}\n\n// --- ATTRACTOR WARM-UP DISCARD ---\n// Discard the first 30 iterations so off-attractor walk points aren't drawn\nif (i < 30) continue;\n\nvec2 hyperZW = vec2(q_zwv.x, q_zwv.y) * rot2D(zwRoll);\nvec2 hyperWV = vec2(q_zwv.y, q_zwv.z) * rot2D(wvRoll);\n\nvec3 pointOffset = vec3(q_xy.x, q_xy.y - spinePos, hyperZW.x + hyperWV.x * 0.5);\npointOffset.xz *= rot2D(yaw);\npointOffset.yz *= rot2D(pitch);\n\nvec3 worldXYZ = pointOffset - vec3(camPos.x, camPos.y, 0.0);\n\nvec3 projPos = worldXYZ * 0.25;\nfloat zDist = projPos.z + camPos.z;\n\nif (zDist > 0.05) {\n    vec2 projUV = (projPos.xy * fov) / zDist;\n\n    // --- VIEW-FRUSTUM CULLING ---\n    if (abs(projUV.x) < (0.5 * (iResolution.x / iResolution.y) + 0.2) && abs(projUV.y) < 0.7) {\n\n        float d = length(uv - projUV);\n\n        // --- SUB-PIXEL PERSPECTIVE RADIUS SCALING ---\n        // Scales footprint by distance and FOV zoom down to a fraction of a physical pixel\n        float pixelSize = 1.0 / iResolution.y;\n        float radius = max(pixelSize * 0.5, (0.75 * pixelSize * fov) / zDist);\n\n        if (d < radius) {\n            vec3 deepStem  = vec3(0.01, 0.18, 0.05);\n            vec3 brightTip = vec3(0.30, 0.95, 0.20);\n            vec3 hyper5D   = vec3(0.85, 0.40, 1.00);\n\n            vec3 color = mix(deepStem, brightTip, clamp(q_xy.y / 10.0, 0.0, 1.0));\n            color = mix(color, hyper5D, clamp(abs(q_zwv.z) * 1.2, 0.0, 1.0));\n\n            float zoomWeightBoost = mix(1.0, 2.5, clamp(1.0 / fov, 0.0, 1.0));\n            vec3 hitColor = color * (1.0 - d / radius) * pointWeight * zoomWeightBoost;\n\n            density += hitColor * exp(-density * 0.35);\n        }\n}\n}\n}\n\nfragColor = vec4(density, 1.0);\n}",
+        "name": "Buffer A",
+        "description": "",
+        "type": "buffer"
+      }
+    ]
+  },
