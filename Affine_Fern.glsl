@@ -2,7 +2,7 @@
  * Copyright (c) 2026 purplarious
  * SPDX-License-Identifier: MIT
  *
-
+// thanks to shadertoy and co
 // ============================================================================
 // MAIN IMAGE TAB - REINHARD TONE MAPPING & DISPLAY
 // ============================================================================
